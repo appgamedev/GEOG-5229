@@ -1,10 +1,115 @@
----
-title: "Calculate and Visualize tax productivity per Acre"
-author: "GROUP-"
-date: "4/10/2022"
-output: html_document
----
+Libraries
+```{r}
 
-```{r setup, include=FALSE}
+options(repos = c(
+    tylermorganwall = 'https://tylermorganwall.r-universe.dev',
+    CRAN = 'https://cloud.r-project.org'))
 
+# Install some packages
+#install.packages('rayshader')
+install.packages('av')
+
+library(rlang)
+library(dplyr)
+library(sf)
+library(sp)
+library(maptools)
+library(GISTools)
+library(tmap)
+library(raster)
+library(tigris)
+library(rayshader)
+library(tmap)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(classInt)
+library(viridis)
+library(av)
+
+# download shapefiles
+
+setwd('C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project')
+
+```
+
+Cleveland Data
+```{r}
+
+# load data
+
+cleveland <- st_read("C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+
+# filter data
+
+cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricit', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
+
+# calculate tax productivity
+
+cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+
+# remove na
+
+cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
+
+# (from classInt library) create classification breaks
+
+#breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "jenks")
+
+# add column to Cleveland dataset using classification breaks
+
+#cleveland <- cleveland %>%
+#             mutate(percent_class = cut(tax_prod, breaks$brks, include.lowest = T))
+
+# plot map
+
+cleveland.map <- ggplot(cleveland) +
+                        geom_sf(aes(fill = tax_prod), color = NA) + # was percent class
+                        scale_fill_brewer(palette = "PuBu", name = "Tax Productivity ($)") +
+                        labs(x = NULL, y = NULL,
+                             title = 'Tax Productivity per Acre, Cleveland, OH',
+                             subtitle = 'Source: Cuyahoga County Open Data') +
+                        theme(line = element_blank(),
+                              axis.text = element_blank(),
+                              axis.title = element_blank(),
+                              panel.background = element_blank())
+
+cleveland.map
+
+# plot 3D map
+
+cleveland.map.3d <- plot_gg(cleveland.map, multicore=TRUE, width=5, height=5, scale=250)
+
+test.map = ggplot(cleveland) +
+  geom_sf(aes(fill = tax_prod)) + # was percent_class
+  scale_fill_viridis("Tax Productivity") +
+  ggtitle("Area of counties in North Carolina") +
+  theme_bw()
+
+plot_gg(test.map, multicore = TRUE, width = 6 ,height=2.7, fov = 70)
+render_depth(focallength=100,focus=0.72)
+
+#justin's code
+
+gg_nc = ggplot(cleveland) +
+  geom_sf(aes(fill = certifie_3)) +
+  ggtitle("Area of counties in North Carolina") +
+  theme_bw()
+
+plot_gg(gg_nc, width = 4, height = 4, scale = 300, multicore = TRUE)
+
+render_movie('cleveland_3D')
+
+# cleveland_map <- tm_shape(cleveland) +
+#                  tm_fill(col = 'tax_prod',
+#                          style = 'fisher',
+#                          palette = 'Greens', 
+#                          border.alpha = 0,
+#                          title = '$/Acre') +
+#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
+#                            main.title.size = 1,
+#                            frame = F,
+#                            legend.outside = T,
+#                            legend.outside.position = 'left') +
+#                  tmap_options(check.and.fix = TRUE)
 ```
