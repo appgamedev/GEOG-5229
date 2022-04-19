@@ -1,0 +1,87 @@
+Libraries
+```{r}
+
+#download shapefiles
+
+library(rlang)
+library(dplyr)
+library(sf)
+library(sp)
+library(maptools)
+library(GISTools)
+library(tmap)
+library(raster)
+library(tigris)
+library(rayshader)
+library(tmap)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+
+setwd('C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project')
+
+```
+
+Cleveland Data
+```{r}
+
+#load data
+
+cleveland <- st_read("C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+
+#filter data
+
+cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricit', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
+
+#calculate tax productivity
+
+cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+
+#remove na
+
+cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
+
+#plot map
+
+cleveland.map <- ggplot(cleveland) + 
+                        geom_sf(mapping = aes(fill = tax_prod), lwd = 0)
+
+cleveland.map
+
+```
+
+Columbus Data
+```{r}
+
+
+
+```
+
+Cincinnati Data
+```{r}
+
+
+
+```
+
+Tax Productivity Analysis
+```{r}
+
+
+
+```
+
+
+Additional Analyses
+```{r}
+
+#average parcel size for each city
+
+```
+
+Geovisualizations
+```{r}
+
+#tax productivity
+
+```
