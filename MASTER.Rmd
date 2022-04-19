@@ -17,6 +17,7 @@ library(tmap)
 library(ggplot2)
 library(tidyverse)
 library(tidyr)
+library(classInt)
 
 setwd('C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project')
 
@@ -41,13 +42,44 @@ cleveland$tax_prod <- with(cleveland, certifie_3/total_acre)
 
 cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
 
+# (from classInt library) create classification breaks
+
+breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "jenks")
+
+# add column to Cleveland dataset using classification breaks
+
+cleveland <- cleveland %>%
+  mutate(percent_class = cut(tax_prod, breaks$brks, include.lowest = T))
+
 #plot map
 
-cleveland.map <- ggplot(cleveland) + 
-                        geom_sf(mapping = aes(fill = tax_prod), lwd = 0)
+cleveland.map <- ggplot() +
+  geom_sf(cleveland, mapping = aes(fill = percent_class), colour = NA) +
+    scale_fill_brewer(palette = "PuBu",
+                    name = "Tax Productivity ($)") +
+  labs(x = NULL, y = NULL,
+       title = 'Tax Productivity per Acre, Cleveland, OH',
+       subtitle = 'Source: Cuyahoga County Open Data',
+       caption = 'No Idea What this is test') +
+  theme(line = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.background = element_blank())
 
 cleveland.map
 
+#cleveland_map <- tm_shape(cleveland) +
+#                  tm_fill(col = 'tax_prod',
+#                          style = 'fisher',
+#                          palette = 'Greens', 
+#                          border.alpha = 0,
+#                          title = '$/Acre') +
+#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
+#                            main.title.size = 1,
+#                            frame = F,
+#                            legend.outside = T,
+#                            legend.outside.position = 'left') +
+#                  tmap_options(check.and.fix = TRUE)
 ```
 
 Columbus Data
