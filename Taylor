@@ -7,7 +7,7 @@ options(repos = c(
 
 # Install some packages
 #install.packages('rayshader')
-install.packages('av')
+#install.packages('av')
 
 library(rlang)
 library(dplyr)
@@ -42,7 +42,7 @@ cleveland <- st_read("C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R
 
 # filter data
 
-cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricit', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
+cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_addr', 'par_predir', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricity', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
 
 # calculate tax productivity
 
@@ -92,9 +92,10 @@ render_depth(focallength=100,focus=0.72)
 #justin's code
 
 gg_nc = ggplot(cleveland) +
-  geom_sf(aes(fill = certifie_3)) +
+  geom_sf(aes(fill = tax_prod)) +
   ggtitle("Area of counties in North Carolina") +
-  theme_bw()
+  theme_bw() +
+  theme(legend.position = NULL)
 
 plot_gg(gg_nc, width = 4, height = 4, scale = 300, multicore = TRUE)
 
