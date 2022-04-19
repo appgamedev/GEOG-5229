@@ -81,39 +81,3 @@ cleveland.map
 #                            legend.outside.position = 'left') +
 #                  tmap_options(check.and.fix = TRUE)
 ```
-
-Columbus Data
-```{r}
-
-
-
-```
-
-Cincinnati Data
-```{r}
-
-
-
-```
-
-Tax Productivity Analysis
-```{r}
-
-
-
-```
-
-
-Additional Analyses
-```{r}
-
-#average parcel size for each city
-
-```
-
-Geovisualizations
-```{r}
-
-#tax productivity
-
-```
