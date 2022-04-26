@@ -1,83 +1,204 @@
 Libraries
+
 ```{r}
 
-#download shapefiles
-
-library(rlang)
-library(dplyr)
 library(sf)
-library(sp)
-library(maptools)
-library(GISTools)
-library(tmap)
-library(raster)
-library(tigris)
-library(rayshader)
-library(tmap)
-library(ggplot2)
-library(tidyverse)
-library(tidyr)
+library(dplyr)
 library(classInt)
+library(tmap)
 
-setwd('C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project')
+setwd('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project')
 
 ```
 
 Cleveland Data
+
+```{r}
+
+# load data
+
+cleveland <- st_read("C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+
+# filter data
+
+cleveland <- dplyr::select(cleveland, c('certifie_3', 'total_acre', 'geometry'))
+
+# calculate tax productivity
+
+cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+
+# remove NA's, then inf's and 0's
+
+cleveland <- cleveland %>%
+             filter(!is.na(tax_prod)) %>%
+             filter(!is.infinite(tax_prod)) %>%
+             filter(tax_prod != 0)
+
+# (from classInt library) create classification breaks
+
+cleveland.breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "fisher")
+
+# add column to Cleveland data set using classification breaks
+
+cleveland <- cleveland %>% mutate(percent_class = cut(tax_prod, cleveland.breaks$brks, include.lowest = T))
+
+```
+
+Cleveland map
+
+```{r}
+
+cleveland.map <- tm_shape(cleveland) +
+                          tm_fill(col = 'tax_prod',
+                                  style = 'fisher',
+                                  palette = 'Greens', 
+                                  border.alpha = 0,
+                                  title = '$/Acre') +
+                          tm_layout(main.title = 'Tax Productivity per Acre ($)',
+                                    main.title.size = 1,
+                                    frame = F,
+                                    legend.outside = T,
+                                    legend.outside.position = 'left') +
+                          tmap_options(check.and.fix = T)
+
+cleveland.map
+
+```
+
+Columbus Data
+
+```{r}
+
+# load data
+
+columbus <- st_read("C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Parcel_Boundaries\\Parcel_Boundaries.shp")
+
+# filter out non columbus metro parcels
+
+columbus <- columbus %>% filter (columbus$CVTTXDSCRP == 'CITY OF COLUMBUS')
+
+# filter data
+
+columbus <- dplyr::select(columbus, c('TOTCNTTXOD','ACRES','geometry'))
+
+# calculate tax productivity
+
+columbus$tax_prod <- with(columbus, TOTCNTTXOD/ACRES) 
+
+# remove NA's, then inf's and 0's
+
+columbus <- columbus %>%
+             filter(!is.na(tax_prod)) %>%
+             filter(!is.infinite(tax_prod)) %>%
+             filter(tax_prod != 0)
+
+# (from classInt library) create classification breaks
+
+columbus.breaks <- classIntervals(columbus$tax_prod, n = 5, style = "fisher")
+
+# add column to Cleveland data set using classification breaks
+
+columbus <- columbus %>% mutate(percent_class = cut(tax_prod, columbus.breaks$brks, include.lowest = T))
+
+```
+
+Columbus Map
+
+```{r}
+
+columbus.map <- tm_shape(columbus) +
+                          tm_fill(col = 'tax_prod',
+                                  palette = 'Greens',
+                                  style = 'fisher',
+                                  border.alpha = 0,
+                                  title = '$/Acre') +
+                          tm_layout(main.title = 'Tax Productivity per Acre ($)',
+                                    main.title.size = 1,
+                                    frame = F,
+                                    legend.outside = T,
+                                    legend.outside.position = 'left') +
+                          tmap_options(check.and.fix = T)
+
+columbus.map
+
+```
+
+Cincinnati Data
+
 ```{r}
 
 #load data
 
-cleveland <- st_read("C:\\Users\\tayqu\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+cincinnati <- st_read('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\cincinnati_parcels\\cincinnati_parcels.shp')
 
 #filter data
 
-cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricit', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
+####cincinnati <- cincinnati %>% filter (cincinnati$CVTTXDSCRP == 'CITY OF COLUMBUS')
 
-#calculate tax productivity
+# filter data
 
-cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+cincinnati <- dplyr::select(cincinnati, c('ANNUAL_TAX','ACREDEED','geometry'))
 
-#remove na
+# calculate tax productivity
 
-cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
+cincinnati$tax_prod <- with(cincinnati, ANNUAL_TAX/ACREDEED) 
+
+# remove NA's, then inf's and 0's
+
+cincinnati <- cincinnati %>%
+             filter(!is.na(tax_prod)) %>%
+             filter(!is.infinite(tax_prod)) %>%
+             filter(tax_prod != 0)
 
 # (from classInt library) create classification breaks
 
-breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "jenks")
+cincinnati.breaks <- classIntervals(cincinnati$tax_prod, n = 5, style = "fisher")
 
-# add column to Cleveland dataset using classification breaks
+# add column to Cleveland data set using classification breaks
 
-cleveland <- cleveland %>%
-  mutate(percent_class = cut(tax_prod, breaks$brks, include.lowest = T))
+cincinnati <- cincinnati %>% mutate(percent_class = cut(tax_prod, cincinnati.breaks$brks, include.lowest = T))
 
-#plot map
+```
 
-cleveland.map <- ggplot() +
-  geom_sf(cleveland, mapping = aes(fill = percent_class), colour = NA) +
-    scale_fill_brewer(palette = "PuBu",
-                    name = "Tax Productivity ($)") +
-  labs(x = NULL, y = NULL,
-       title = 'Tax Productivity per Acre, Cleveland, OH',
-       subtitle = 'Source: Cuyahoga County Open Data',
-       caption = 'No Idea What this is test') +
-  theme(line = element_blank(),
-        axis.text = element_blank(),
-        axis.title = element_blank(),
-        panel.background = element_blank())
+Cincinnati Map
 
-cleveland.map
+```{r}
 
-#cleveland_map <- tm_shape(cleveland) +
-#                  tm_fill(col = 'tax_prod',
-#                          style = 'fisher',
-#                          palette = 'Greens', 
-#                          border.alpha = 0,
-#                          title = '$/Acre') +
-#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
-#                            main.title.size = 1,
-#                            frame = F,
-#                            legend.outside = T,
-#                            legend.outside.position = 'left') +
-#                  tmap_options(check.and.fix = TRUE)
+cincinnati.map <- tm_shape(cincinnati) +
+                          tm_fill(col = 'tax_prod',
+                                  palette = 'Greens',
+                                  style = 'fisher',
+                                  border.alpha = 0,
+                                  title = '$/Acre') +
+                          tm_layout(main.title = 'Tax Productivity per Acre ($)',
+                                    main.title.size = 1,
+                                    frame = F,
+                                    legend.outside = T,
+                                    legend.outside.position = 'left') +
+                          tmap_options(check.and.fix = T)
+
+cincinnati.map
+
+```
+Third plot comparing statistics
+
+```{r}
+
+#average parcel size
+
+cleveland.parcel.sum <- rowSums(certifie_3)
+
+cleveland.average.size <- cleveland.parcel.sum/133045
+
+#total tax income
+
+```
+
+
+Analysis
+
+```{r}
+
+tmap_arrange(cleveland.map, columbus.map, cincinnati.map)
+
 ```
