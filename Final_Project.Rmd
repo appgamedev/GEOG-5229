@@ -1,0 +1,275 @@
+---
+title: "dfhsh"
+author: "Trevor Simpkins"
+date: "4/19/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# columbus <- dplyr::select(columbus, c('PARCELID', 'SALEPRICE', 'SITEADDRES', 'ZIPCD', ))
+```
+
+```{r}
+# install.packages('classInt', dependencies = T)
+```
+
+
+```{r}
+
+library(rlang)
+library(dplyr)
+library(sf)
+library(sp)
+library(maptools)
+library(GISTools)
+library(tmap)
+library(raster)
+library(tigris)
+library(rayshader)
+library(tmap)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(classInt)
+
+setwd('C:\\Users\\simpkins.83\\OneDrive - The Ohio State University\\Desktop\\Topics of GIS\\Final Project\\Data')
+```
+
+Cleveland Data
+```{r}
+# options(scipen = 100, digits = 4)
+# #load data
+# cleveland <- st_read("C:\\Users\\trevo\\OneDrive - The Ohio State University\\Desktop\\Topics of GIS\\Final Project\\Data\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+# #filter data
+# cleveland <- dplyr::select(cleveland, c('parcelpin', 'parcel_typ', 'sales_amou', 'par_street', 'par_unit', 'par_zip', 'tax_luc', 'tax_luc_de', 'ext_luc', 'ext_luc_de', 'zoning_cod', 'zoning_use', 'property_c', 'tax_distri', 'neighborho', 'tax_abatem', 'road_type', 'water', 'sewer', 'gas', 'electricit', 'certified_', 'certifie_3', 'certifie_4', 'certifie_5', 'certifie_7', 'certifie_8', 'certifie11', 'gross_cert', 'gross_ce_1', 'gross_ce_2', 'res_bldg_c', 'total_res_', 'total_re_1', 'com_bldg_c', 'total_com_', 'com_living', 'total_squa', 'total_acre', 'PARCEL_PK', 'parcel_id', 'geometry'))
+# #calculate tax productivity
+# cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+# #remove na
+# cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
+# # (from classInt library) create classification breaks
+# breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "jenks")
+# # add column to Cleveland dataset using classification breaks
+# cleveland <- cleveland %>%
+#   mutate(percent_class = cut(tax_prod, breaks$brks, include.lowest = T))
+# #plot map
+# # cleveland.map <- ggplot() +
+# #   geom_sf(cleveland, mapping = aes(fill = percent_class), colour = NA) +
+# #     scale_fill_brewer(palette = "PuBu",
+# #                     name = "Tax Productivity ($)") +
+# #   labs(x = NULL, y = NULL,
+# #        title = 'Tax Productivity per Acre, Cleveland, OH',
+# #        subtitle = 'Source: Cuyahoga County Open Data',
+# #        caption = 'No Idea What this is test') +
+# #   theme(line = element_blank(),
+# #         axis.text = element_blank(),
+# #         axis.title = element_blank(),
+# #         panel.background = element_blank())
+# # cleveland.map
+# cleveland_map <- tm_shape(cleveland) +
+#                  tm_fill(col = 'tax_prod',
+#                          style = 'fisher',
+#                          palette = 'Greens',
+#                          border.alpha = 0,
+#                          title = '$/Acre') +
+#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
+#                            main.title.size = 1,
+#                            frame = F,
+#                            legend.outside = T,
+#                            legend.outside.position = 'left') +
+#                  tmap_options(check.and.fix = TRUE)
+# cleveland_map
+# 
+# # gg_nc = ggplot(cleveland) +
+# #   geom_sf(aes(fill = certifie_3)) +
+# #   ggtitle("Area of counties in North Carolina") +
+# #   theme_bw()
+# # plot_gg(gg_nc, width = 4, height = 4, scale = 300, multicore = TRUE)
+# ```
+# 
+# ```{r}
+# schools <- st_read("C:\\Users\\trevo\\OneDrive - The Ohio State University\\Desktop\\Topics of GIS\\Final Project\\Data\\OH_highschoolsgradrates\\OH_highschoolsgradrates.shp")
+# 
+# cleveland_sch <- tm_dots(schools) + 
+#                  tm_fill(palette = 'Greens',
+#                          border.alpha = 0,
+#                          title = '$/Acre') +
+#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
+#                            main.title.size = 1,
+#                            frame = F,
+#                            legend.outside = T,
+#                            legend.outside.position = 'left') +
+#                  tmap_options(check.and.fix = TRUE)
+# cleveland_sch
+# ```
+# 
+# 
+# Columbus Data
+# ```{r}
+# options(scipen = 100, digits = 4)
+# #load data
+# columbus <- st_read("C:\\Users\\trevo\\OneDrive - The Ohio State University\\Desktop\\Topics of GIS\\Final Project\\Data\\Parcel_Boundaries\\Parcel_Boundaries.shp")
+# 
+# #filter data
+# columbus <- dplyr::select(columbus, c('PARCELID', 'ACRES', 'CVTTXDSCRP', 'SCHLTXCD', 'SCHLDSCRP', 'CLASSDSCRP', 'SITEADDRES', 'ZIPCD', 'MAILNME1', 'SALEPRICE', 'RENTAL', 'RESFLRAREA', 'RESSTRTYP', 'BLDGAREA', 'LNDVALUEBA', 'BLDVALUEBA', 'TOTVALUEBA', 'CNTTXBLVAL', 'PRVTXBLVAL', 'TOTCNTTXOD'))
+# 
+# #calculate tax productivity
+# columbus$tax_prod <- with(cleveland, certifie_3/total_acre) 
+# 
+# #remove na
+# cleveland <- cleveland %>% filter(!is.na(cleveland$tax_prod))
+# 
+# # (from classInt library) create classification breaks
+# breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "jenks")
+# 
+# # add column to Cleveland dataset using classification breaks
+# cleveland <- cleveland %>%
+#   mutate(percent_class = cut(tax_prod, breaks$brks, include.lowest = T))
+# 
+# # Plot
+# cleveland_map <- tm_shape(cleveland) +
+#                  tm_fill(col = 'tax_prod',
+#                          style = 'fisher',
+#                          palette = 'Greens',
+#                          border.alpha = 0,
+#                          title = '$/Acre') +
+#                  tm_layout(main.title = 'Tax Productivity per Acre ($)',
+#                            main.title.size = 1,
+#                            frame = F,
+#                            legend.outside = T,
+#                            legend.outside.position = 'left') +
+#                  tmap_options(check.and.fix = TRUE)
+# cleveland_map
+```
+
+
+```{r}
+OhioCounty <- read.csv('C:\\Users\\simpkins.83\\OneDrive - The Ohio State University\\Shared Documents\\County_data\\15incyallnoagi.csv')
+OhioCounty <- OhioCounty[,c(3,4,26,30,36,65,110)]
+colnames(OhioCounty) <- c('CountyFID','NAMELSAD', "Interest", "Dividend_month", "Capital_gain", "Deductions", "Total_tax")
+
+shpdata <- st_read('C:\\Users\\simpkins.83\\OneDrive - The Ohio State University\\Shared Documents\\County_data\\Counties_Data.shp')
+Ohiodata <- shpdata %>% filter (shpdata$STATEFP == 39)
+
+Ohiotaxdata <- left_join(Ohiodata, OhioCounty, by = 'NAMELSAD')
+Ohiotaxdatasf <- st_as_sf(Ohiotaxdata)
+```
+
+```{r}
+map1 <- tm_shape(Ohiotaxdatasf, unit = "mi") +
+  tm_style ("cobalt") +
+  tm_polygons(col = "Interest", style = "jenks", palette = "Reds", 
+              border.alpha = 1, title = "Interest") +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15) +
+  tm_compass(position = c("left", "top"), size = 2) +
+    tm_layout(main.title = "Ohio Counties Tax Interest",
+             main.title.size = 1.5, frame = T, frame.double.line = T,
+            legend.outside = TRUE, legend.outside.position = "right",legend.frame = T, inner.margins = 0.1)+
+  tm_credits(" Source: \n irs.gov",align = "center", position=c("right", "bottom"),size = 0.38)
+
+map2 <- tm_shape(Ohiotaxdatasf, unit = "mi") +
+  tm_style ("cobalt") +
+  tm_polygons(col = "Dividend_month", style = "jenks", palette = "Reds", 
+              border.alpha = 1, title = "Dividend") +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15) +
+  tm_compass(position = c("left", "top"), size = 2) +
+    tm_layout(main.title = "Ohio Counties Dividend per month",
+             main.title.size = 1.5, frame = T, frame.double.line = T,
+            legend.outside = TRUE, legend.outside.position = "right",legend.frame = T, inner.margins = 0.1)+
+  tm_credits(" Source: \n irs.gov",align = "center", position=c("right", "bottom"),size = 0.38)
+
+map3 <- tm_shape(Ohiotaxdatasf, unit = "mi") +
+  tm_style ("cobalt") +
+  tm_polygons(col = "Capital_gain", style = "jenks", palette = "Reds", 
+              border.alpha = 1, title = "Capital") +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15) +
+  tm_compass(position = c("left", "top"), size = 2) +
+    tm_layout(main.title = "Ohio Counties Tax Capital gain",
+             main.title.size = 1.5, frame = T, frame.double.line = T,
+            legend.outside = TRUE, legend.outside.position = "right",legend.frame = T, inner.margins = 0.1)+
+  tm_credits(" Source: \n irs.gov",align = "center", position=c("right", "bottom"),size = 0.38)
+
+map4 <- tm_shape(Ohiotaxdatasf, unit = "mi") +
+  tm_style ("cobalt") +
+  tm_polygons(col = "Deductions",style = "jenks", palette = "Reds", 
+              border.alpha = 1, title = "Deductions") +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15) +
+  tm_compass(position = c("left", "top"), size = 2) +
+    tm_layout(main.title = "Ohio Counties Tax Deductions",
+             main.title.size = 1.5, frame = T, frame.double.line = T,
+            legend.outside = TRUE, legend.outside.position = "right",legend.frame = T, inner.margins = 0.1)+
+  tm_credits(" Source: \n irs.gov",align = "center", position=c("right", "bottom"),size = 0.38)
+
+map5 <- tm_shape(Ohiotaxdatasf, unit = "mi") +
+  tm_style ("cobalt") +
+  tm_polygons(col = "Total_tax", style = "jenks", palette = "Reds", 
+              border.alpha = 1, title = "Tax Revenue") +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15) +
+  tm_compass(position = c("left", "top"), size = 2) +
+    tm_layout(main.title = "Ohio Counties Total Tax Revenue",
+             main.title.size = 1.5, frame = T, frame.double.line = T,
+            legend.outside = TRUE, legend.outside.position = "right",legend.frame = T, inner.margins = 0.1)+
+  tm_credits(" Source: \n irs.gov",align = "center", position=c("right", "bottom"),size = 0.38)
+
+map1
+map2
+map3
+map4
+map5
+```
+
+
+Tax Productivity Analysis
+```{r}
+```
+
+
+Additional Analyses
+```{r}
+#average parcel size for each city
+```
+
+Geovisualizations
+```{r}
+#tax productivity
+```
+
+Columbus Data
+```{r}
+
+
+
+```
+
+Cincinnati Data
+```{r}
+
+
+
+```
+
+Tax Productivity Analysis
+```{r}
+
+
+
+```
+
+
+Additional Analyses
+```{r}
+
+#average parcel size for each city
+
+```
+
+Geovisualizations
+```{r}
+
+#tax productivity
+
+```
+
