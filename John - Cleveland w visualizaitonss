@@ -221,6 +221,12 @@ clejoined <- left_join(clejoined, totalresrooms, by = 'GEOID')
 # Turn graduation rate from percentage to decimal for comparison in scatter plot
 
 clejoined$AvgGradRate <- clejoined$AvgGradRate / 100
+
+# Create another variable for population density within census tracts
+
+clejoined$area <- st_area(clejoined)
+clejoined <- clejoined %>%
+  mutate(pop_den = (tpopE / area) / 3.86102e-7) # Roughly per sq mi
 ```
 
 ## Cleveland visualizaitons
