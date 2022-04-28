@@ -17,30 +17,30 @@ Cleveland Data
 
 # load data
 
-cleveland <- st_read("C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_Cleveland_Only\\Combined_Parcels_-_Cleveland_Only.shp")
+cle <- st_read('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Combined_Parcels_-_cle_Only\\Combined_Parcels_-_cle_Only.shp')
 
 # filter data
 
-cleveland <- dplyr::select(cleveland, c('certifie_3', 'total_acre', 'geometry'))
+cle <- dplyr::select(cle, c('certifie_3', 'total_acre', 'geometry'))
 
 # calculate tax productivity
 
-cleveland$tax_prod <- with(cleveland, certifie_3/total_acre) 
+cle$tax_prod <- with(cle, certifie_3/total_acre) 
 
 # remove NA's, then inf's and 0's
 
-cleveland <- cleveland %>%
+cle <- cle %>%
              filter(!is.na(tax_prod)) %>%
              filter(!is.infinite(tax_prod)) %>%
              filter(tax_prod != 0)
 
 # (from classInt library) create classification breaks
 
-cleveland.breaks <- classIntervals(cleveland$tax_prod, n = 5, style = "fisher")
+cle.breaks <- classIntervals(cle$tax_prod, n = 5, style = 'fisher')
 
-# add column to Cleveland data set using classification breaks
+# add column to cle data set using classification breaks
 
-cleveland <- cleveland %>% mutate(percent_class = cut(tax_prod, cleveland.breaks$brks, include.lowest = T))
+cle <- cle %>% mutate(percent_class = cut(tax_prod, cle.breaks$brks, include.lowest = T))
 
 ```
 
@@ -48,7 +48,7 @@ Cleveland map
 
 ```{r}
 
-cleveland.map <- tm_shape(cleveland) +
+cle.map <- tm_shape(cle) +
                           tm_fill(col = 'tax_prod',
                                   style = 'fisher',
                                   palette = 'Greens', 
@@ -61,8 +61,6 @@ cleveland.map <- tm_shape(cleveland) +
                                     legend.outside.position = 'left') +
                           tmap_options(check.and.fix = T)
 
-cleveland.map
-
 ```
 
 Columbus Data
@@ -71,34 +69,34 @@ Columbus Data
 
 # load data
 
-columbus <- st_read("C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Parcel_Boundaries\\Parcel_Boundaries.shp")
+cbus <- st_read('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\Parcel_Boundaries\\Parcel_Boundaries.shp')
 
-# filter out non columbus metro parcels
+# filter out non cbus metro parcels
 
-columbus <- columbus %>% filter (columbus$CVTTXDSCRP == 'CITY OF COLUMBUS')
+cbus <- cbus %>% filter (cbus$CVTTXDSCRP == 'CITY OF cbus')
 
 # filter data
 
-columbus <- dplyr::select(columbus, c('TOTCNTTXOD','ACRES','geometry'))
+cbus <- dplyr::select(cbus, c('TOTCNTTXOD','ACRES','geometry'))
 
 # calculate tax productivity
 
-columbus$tax_prod <- with(columbus, TOTCNTTXOD/ACRES) 
+cbus$tax_prod <- with(cbus, TOTCNTTXOD/ACRES) 
 
 # remove NA's, then inf's and 0's
 
-columbus <- columbus %>%
+cbus <- cbus %>%
              filter(!is.na(tax_prod)) %>%
              filter(!is.infinite(tax_prod)) %>%
              filter(tax_prod != 0)
 
 # (from classInt library) create classification breaks
 
-columbus.breaks <- classIntervals(columbus$tax_prod, n = 5, style = "fisher")
+cbus.breaks <- classIntervals(cbus$tax_prod, n = 5, style = 'fisher')
 
-# add column to Cleveland data set using classification breaks
+# add column to cle data set using classification breaks
 
-columbus <- columbus %>% mutate(percent_class = cut(tax_prod, columbus.breaks$brks, include.lowest = T))
+cbus <- cbus %>% mutate(percent_class = cut(tax_prod, cbus.breaks$brks, include.lowest = T))
 
 ```
 
@@ -106,7 +104,7 @@ Columbus Map
 
 ```{r}
 
-columbus.map <- tm_shape(columbus) +
+cbus.map <- tm_shape(cbus) +
                           tm_fill(col = 'tax_prod',
                                   palette = 'Greens',
                                   style = 'fisher',
@@ -118,8 +116,6 @@ columbus.map <- tm_shape(columbus) +
                                     legend.outside = T,
                                     legend.outside.position = 'left') +
                           tmap_options(check.and.fix = T)
-
-columbus.map
 
 ```
 
@@ -129,34 +125,34 @@ Cincinnati Data
 
 #load data
 
-cincinnati <- st_read('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\cincinnati_parcels\\cincinnati_parcels.shp')
+cin <- st_read('C:\\Users\\Taylor\\My Drive\\School\\01 Current Semester\\R\\06 Final Project\\cin_parcels\\cin_parcels.shp')
 
 #filter data
 
-####cincinnati <- cincinnati %>% filter (cincinnati$CVTTXDSCRP == 'CITY OF COLUMBUS')
+####cin <- cin %>% filter (cin$CVTTXDSCRP == 'CITY OF cbus')
 
 # filter data
 
-cincinnati <- dplyr::select(cincinnati, c('ANNUAL_TAX','ACREDEED','geometry'))
+cin <- dplyr::select(cin, c('ANNUAL_TAX','ACREDEED','geometry'))
 
 # calculate tax productivity
 
-cincinnati$tax_prod <- with(cincinnati, ANNUAL_TAX/ACREDEED) 
+cin$tax_prod <- with(cin, ANNUAL_TAX/ACREDEED) 
 
 # remove NA's, then inf's and 0's
 
-cincinnati <- cincinnati %>%
+cin <- cin %>%
              filter(!is.na(tax_prod)) %>%
              filter(!is.infinite(tax_prod)) %>%
              filter(tax_prod != 0)
 
 # (from classInt library) create classification breaks
 
-cincinnati.breaks <- classIntervals(cincinnati$tax_prod, n = 5, style = "fisher")
+cin.breaks <- classIntervals(cin$tax_prod, n = 5, style = 'fisher')
 
-# add column to Cleveland data set using classification breaks
+# add column to cle data set using classification breaks
 
-cincinnati <- cincinnati %>% mutate(percent_class = cut(tax_prod, cincinnati.breaks$brks, include.lowest = T))
+cin <- cin %>% mutate(percent_class = cut(tax_prod, cin.breaks$brks, include.lowest = T))
 
 ```
 
@@ -164,7 +160,7 @@ Cincinnati Map
 
 ```{r}
 
-cincinnati.map <- tm_shape(cincinnati) +
+cin.map <- tm_shape(cin) +
                           tm_fill(col = 'tax_prod',
                                   palette = 'Greens',
                                   style = 'fisher',
@@ -177,28 +173,28 @@ cincinnati.map <- tm_shape(cincinnati) +
                                     legend.outside.position = 'left') +
                           tmap_options(check.and.fix = T)
 
-cincinnati.map
+cin.map
 
 ```
+
 Third plot comparing statistics
 
 ```{r}
 
 #average parcel size
 
-cleveland.parcel.sum <- rowSums(certifie_3)
+cle.parcel.sum <- rowSums(cle$certifie_3)
 
-cleveland.average.size <- cleveland.parcel.sum/133045
+cle.average.size <- cle.parcel.sum/133045
 
 #total tax income
 
 ```
 
-
 Analysis
 
 ```{r}
 
-tmap_arrange(cleveland.map, columbus.map, cincinnati.map)
+tmap_arrange(cle.map, cbus.map, cin.map)
 
 ```
