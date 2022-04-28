@@ -1,0 +1,323 @@
+---
+title: "Untitled"
+author: "John Burza"
+date: '2022-04-28'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Libraries
+
+```{r warning=F, message=F, error=F, results='hide'}
+library(sp)
+library(sf) # spdf
+library(dplyr) # contained in tidyverse
+library(classInt) # probably don't need this
+library(tmap)
+library(gstat) # probably don't need
+library(deldir) # for voronoi function
+library(tidyverse)
+library(tmap)
+library(tidycensus)
+library(tigris)
+
+setwd('C:\\Users\\Johnny\\OneDrive - The Ohio State University\\Documents\\OSU\\22SP\\GEOG5229\\Labs\\final')
+
+sf::sf_use_s2(FALSE) # spdf function weird output, default all sf to planar
+```
+
+## Loading data
+### Cleveland data sourced from Cuyahoga County's Open Data Portal
+
+```{r warning=F, message=F, error=F, results='hide'}
+
+# Load the given shapefile and transform it to WGS84 for analysis later
+
+cleveland <- st_read('Combined_Parcels_-_Cleveland_Only.shp') %>%
+  st_transform(4326)
+
+# Since the shapefile is so large, remove unecessary columns and only keep the certified taxable land for each parcel, the parcel's total acerage, the sqft area of residential living areas if the parcel is zoned residential, the number of residential rooms, and the polygon's geometry
+
+cleveland <- dplyr::select(cleveland, c('CertTaxLand' = 'certifie_3', 'total_acre', 'ResLivArea' = "total_res_", 'ResRooms' = "total_re_1", 'geometry'))
+
+# Calculate tax productivity per acre for each parcel
+
+cleveland$tax_prod <- with(cleveland, CertTaxLand/total_acre)
+
+# remove NA's, then inf's and 0's from calculated tax productivity column
+
+cleveland <- cleveland %>%
+             filter(!is.na(tax_prod)) %>%
+             filter(!is.infinite(tax_prod)) %>%
+             filter(tax_prod != 0)
+```
+
+### High school graduation rate data from Ohio's Board of Education
+
+```{r warning=F, message=F, error=F, results='hide'}
+# Import shapefile but immediately drop geometry because sf objects are not compatible with Voronoi function defined below
+
+hs.df <- st_drop_geometry(st_read('OH_highschoolsgradrates.shp'))
+
+# Clean the data frame for only a few select columns: high school name, it's coordinate location (WGS84), which county the school's a part of, and the recorded graduation rate
+
+hs.df <- hs.df[,c('Name ' = 'ORG_NM', 'LON', 'LAT', 'County', 'GradRate')]
+```
+
+### Import census tract socio-demographic data
+
+```{r warning=F, message=F, error=F, results='hide'}
+# Tract-level data is large enough that it allows for aggregation of parcel data, but is small enough to show population densities within different regions of Cleveland, Columbus and Cincinnati
+
+# Request 2019 5-Year American Community Survey data for all of Ohio which will be clipped later
+
+tracts <- get_acs(geography = 'tract',
+                  year = 2019,
+                  variables = c(tpop = "B01003_001", tpopr = "B03002_001", 
+                            nhwhite = "B03002_003", nhblk = "B03002_004",
+                             nhasn = "B03002_006", hisp = "B03002_012",
+                            medinc = "B19013_001"),
+                  state = 'OH',
+                  survey = 'acs5',
+                  output = 'wide',
+                  geometry = TRUE)
+
+# Filter census tracts that have no valid geometry (census tracts around parts of Lake Erie) and then calculate the racial and ethnic percentage of each census tract within Ohio. Also, reproject data/unproject data to WGS84 for consistency with other data sets
+
+tracts <- tracts %>%
+  group_by(NAME) %>%
+  filter(!is.na(geometry)) %>%
+  mutate(pct_nhw = nhwhiteE / tpopE,
+          pct_nhblk = nhblkE / tpopE,
+          pct_nhasn = nhasnE / tpopE,
+          pct_hisp = hispE / tpopE) %>%
+  st_transform(4326)
+
+# Remove unecessary columns in the data set and only keep socio-demographic information
+tracts <- tracts[,c(1:3,15, 17:21)]
+```
+
+### Importing local zoning information
+
+```{r}
+# Import zoning shapefile provided by Cuyahoga's Open Data Portal and transform to WGS84
+
+clezoning <- st_read('zoning_districts.shp') %>%
+  st_transform(4326)
+```
+
+
+
+### Creating function for Thiessen's polygons for analysis of high school graduation rates
+
+```{r}
+# Function for Voronoi's polygons sourced from Carson Farmer.
+# http://www.carsonfarmer.com/2009/09/voronoi-polygons-with-r/
+# Subject to minor stylistic modifications
+#
+# Modified Carson Farmer code:
+
+voronoipolygons = function(layer) {
+  crds <- layer@coords
+  z <- deldir(crds[,1], crds[,2])
+  w <- tile.list(z)
+  polys <- vector(mode='list', length=length(w))
+  for (i in seq(along=polys)) {
+    pcrds <- cbind(w[[i]]$x, w[[i]]$y)
+    pcrds <- rbind(pcrds, pcrds[1,])
+    polys[[i]] <- Polygons(list(Polygon(pcrds)),
+                           ID=as.character(i))
+  }
+  SP <- SpatialPolygons(polys)
+  voronoi <- SpatialPolygonsDataFrame(SP, 
+                data=data.frame(x=crds[,1], 
+                                y=crds[,2], 
+                                layer@data,
+                                row.names=sapply(slot(SP, 'polygons'), 
+                                                 function(x) slot(x, 'ID'))))
+  proj4string(voronoi) <- CRS(proj4string(layer))
+  return(voronoi)
+}
+```
+
+## Beginning analyses
+### Creating Spatial Points Data Frames from high school point locations
+
+```{r warning=F, message=F, error=F, results='hide'}
+# Not the most intuitive, but this for loop imports the points by their coordinate locations (WGS84) into a spatial data frame, then calculates Thiessen's polygons for each point. Points are subset at the county-level to ensure the municipal tax productivity can be joined to the interpolated high school graduation rates for each city.
+
+for (county in hs.df$County) {
+  cu.spdf <- hs.df[hs.df$County == 'Cuyahoga',]
+    cu.spdf <- SpatialPointsDataFrame(cbind(cu.spdf$LON, cu.spdf$LAT), cu.spdf) 
+    proj4string(cu.spdf) <- CRS('+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    cu.spdf <- voronoipolygons(cu.spdf)
+  fr.spdf <- hs.df[hs.df$County == 'Franklin',]
+    fr.spdf <- SpatialPointsDataFrame(cbind(fr.spdf$LON, fr.spdf$LAT), fr.spdf)
+    proj4string(fr.spdf) <- CRS('+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    fr.spdf <- voronoipolygons(fr.spdf)
+  ha.spdf <- hs.df[hs.df$County == 'Hamilton',]
+    ha.spdf <- SpatialPointsDataFrame(cbind(ha.spdf$LON, ha.spdf$LAT), ha.spdf)
+    proj4string(ha.spdf) <- CRS('+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    ha.spdf <- voronoipolygons(ha.spdf)
+}
+```
+
+### Converting SpatialPointsDataFrame to sf objects for intersection with parcel's data
+
+```{r warning=F, message=F, error=F, results='hide'}
+# From the Voronoi polygon's output, convert a foreign object -- SpatialPointsDataFrame -- to an sf object using the spdf's coordinates
+
+cu.sf <- st_as_sf(cu.spdf, coords = (for (i in length(cu.spdf)){
+  x = cu.spdf@polygons[[i]]@labpt[1]
+  y = cu.spdf@polygons[[i]]@labpt[2]}),
+  crs = 4326)
+
+# Create new object of census tract that share geometry with Cleveland
+
+cletracts <- tracts[cleveland,]
+
+# Join the subset census tracts for Cleveland to the Cleveland parcel data, then spatially join the census tract parcel data to the Voronoi polygons with graduation information, followed by the zoning information
+
+clejoined <- st_join(cletracts, cleveland)
+clejoined <- st_join(clejoined, cu.sf)
+clejoined <- st_join(clejoined, clezoning)
+```
+
+### Aggregate tax productivity and graduation rates for high schools by census tract
+
+```{r}
+# Create new variables: one for tax productivity, one for graduation rate data, one for residential living space, and one for the number of residential rooms. These will be joined to a subset of Cleveland census tract data that removes duplicate census tracts
+
+taxprod <- aggregate(clejoined$tax_prod, by = list(clejoined$GEOID), FUN = mean)
+gradrate <- aggregate(clejoined$GradRate, by = list(clejoined$GEOID), FUN = mean)
+totreslivsp <- aggregate(clejoined$ResLivArea, by = list(clejoined$GEOID), FUN = sum)
+totalresrooms <- aggregate(clejoined$ResRooms, by = list(clejoined$GEOID), FUN = sum)
+
+# Clean the dataset by removing duplicate values
+
+clejoined <- clejoined[!duplicated(clejoined$GEOID),]
+
+# Rename columns to be human-friendly
+
+colnames(taxprod) <- c('GEOID', 'AvgTaxProd')
+colnames(gradrate) <- c('GEOID', 'AvgGradRate')
+colnames(totreslivsp) <- c('GEOID', 'TotResLivSp')
+colnames(totalresrooms) <- c('GEOID', 'TotResRooms')
+
+# Remove unnecessary columns no longer needed in aggregation
+
+clejoined <- clejoined[,-c(10:24, 26)]
+
+# Left-joins for the Cleveland data set joined by census tracts, Voronoi polygon grad data, residential living space, and the total residential rooms
+
+clejoined <- left_join(clejoined, taxprod, by = 'GEOID')
+clejoined <- left_join(clejoined, gradrate, by = 'GEOID')
+clejoined <- left_join(clejoined, totreslivsp, by = 'GEOID')
+clejoined <- left_join(clejoined, totalresrooms, by = 'GEOID')
+
+# Turn graduation rate from percentage to decimal for comparison in scatter plot
+
+clejoined$AvgGradRate <- clejoined$AvgGradRate / 100
+```
+
+## Cleveland visualizaitons
+
+```{r}
+# Census tracts by interpolated high school graduation rate
+
+gr <- tm_shape(clejoined) +
+  tm_polygons(col = 'AvgGradRate', title = 'HS Graduation Rate (%)',
+              legend.hist = T, style = 'jenks') +
+  tm_layout(frame = FALSE,
+          legend.outside = TRUE,
+          legend.outside.position = 'right',
+          legend.hist.width = 3,
+          main.title = 'Interpolated HS Graduation Rates for Census Tracts within Cle',
+          main.title.position = 'center')
+
+gr
+```
+
+
+```{r}
+# Demographic information per census tract
+
+re <- tm_shape(clejoined) +
+  tm_polygons(col = c('pct_nhw', 'pct_nhblk', 'pct_nhasn', 'pct_hisp'),
+             legend.col.is.portrait = TRUE, title = '% Race / Ethnicity',
+             border.alpha = 0.4) +
+  tm_facets(sync = TRUE, ncol = 2) +
+tm_layout(frame = FALSE,
+          main.title = 'Proportion of Each Race & Ethnicity',
+          main.title.position = 'left',
+          legend.outside = TRUE,
+          legend.outside.position = 'right',
+          panel.show = TRUE,
+          panel.labels = c('White', 'Black', 'Asian', 'Hispanic'),
+          panel.label.size = 1.3,
+          panel.label.bg.color = 'white')
+
+re
+```
+
+
+```{r warning=F}
+# Create stacked bar chart for deomgraphic information of the top 5 tax producing census tracts
+
+ct5 <- clejoined %>% slice_max(clejoined$AvgTaxProd, n = 6) # selecting 6 because one census tract is a lake census tract with no data
+
+# Repleace characters in census tract names to keep only numbers
+ct5$NAME <- gsub('[A-Z, a-z]*','', ct5$NAME)
+
+# Drop geometry and create bar chart by the value of the racial and ethnic percentages for each census tract
+toptaxtracts <- st_drop_geometry(ct5) %>%
+  group_by(NAME) %>%
+  summarise(n=n(),
+            'Non-Hisp. White' = pct_nhw,
+            'Non-Hisp. Black' = pct_nhblk,
+            'Non-Hisp. Asian' = pct_nhasn,
+            'Hispanic' = pct_hisp) %>% 
+  gather("key", "value", - c(NAME, n)) %>%
+  ggplot(aes(x = NAME, y = value, group = key, fill = key)) + geom_col() +
+  theme(panel.background = element_blank()) +
+  labs(title = 'Top 5 Census Tracts by Average Land Tax Value, Cleveland, Ohio',
+       x = 'Census Tract',
+       y = 'Race / Ethnicity (Propotion of Total)',
+       fill = 'Race / Ethnicity')
+
+toptaxtracts
+```
+
+
+```{r}
+# Create stacked bar chart for deomgraphic information of the bottom 5 tax producing census tracts
+
+cb5 <- clejoined %>% slice_min(clejoined$AvgTaxProd, n = 5)
+
+# Repleace characters in census tract names to keep only numbers
+
+cb5$NAME <- gsub('[A-Z, a-z]*','', cb5$NAME)
+
+# Drop geometry and create bar chart by the value of the racial and ethnic percentages for each census tract
+
+lowesttaxtracts <- st_drop_geometry(cb5) %>%
+  group_by(NAME) %>%
+  summarise(n=n(),
+            'Non-Hisp. White' = pct_nhw,
+            'Non-Hisp. Black' = pct_nhblk,
+            'Non-Hisp. Asian' = pct_nhasn,
+            'Hispanic' = pct_hisp) %>% 
+  gather("key", "value", - c(NAME, n)) %>%
+  ggplot(aes(x = NAME, y = value, group = key, fill = key)) + geom_col() +
+  theme(panel.background = element_blank()) +
+  labs(title = 'Bottom 5 Census Tracts by Average Land Tax Value, Cleveland, Ohio',
+       x = 'Census Tract',
+       y = 'Race / Ethnicity (Propotion of Total)',
+       fill = 'Race / Ethnicity')
+
+lowesttaxtracts
+```
+
