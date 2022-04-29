@@ -363,3 +363,190 @@ rownames(clecor) <- c('Total Population', 'Med. Inc', '% NH White', '% NH Black'
 corrplot(clecor, type = 'upper')
 ```
 
+##############################################################################################
+## Columbus data cleaning
+### Converting SpatialPointsDataFrame to sf objects for intersection with parcels data
+
+```{r warning=F, message=F, error=F, results='hide'}
+# From the Voronoi polygon's output, convert a foreign object -- SpatialPointsDataFrame -- to an sf object using the spdf's coordinates
+
+fr.sf <- st_as_sf(fr.spdf, coords = (for (i in length(fr.spdf)){
+  x = fr.spdf@polygons[[i]]@labpt[1]
+  y = fr.spdf@polygons[[i]]@labpt[2]}),
+  crs = 4326)
+
+# Create new object of census tract that share geometry with Columbus
+
+coltracts <- tracts[columbus,]
+
+# Join the subset census tracts for Columbus to the Columbus parcel data, then spatially join the census tract parcel data to the Voronoi polygons with graduation information, followed by the zoning information
+
+cbusjoined <- st_join(coltracts, columbus)
+cbusjoined <- st_join(cbusjoined, fr.sf)
+cbusjoined <- st_join(cbusjoined, cbuszoning)
+```
+
+### Aggregate tax productivity and graduation rates for high schools by census tract
+
+```{r}
+# Create new variables: one for tax productivity, one for graduation rate data, one for residential living space, and one for the number of residential rooms. These will be joined to a subset of Cleveland census tract data that removes duplicate census tracts
+
+taxprod <- aggregate(cbusjoined$tax_prod, by = list(cbusjoined$GEOID), FUN = mean)
+gradrate <- aggregate(cbusjoined$GradRate, by = list(cbusjoined$GEOID), FUN = mean)
+totreslivsp <- aggregate(cbusjoined$ResLivArea, by = list(cbusjoined$GEOID), FUN = sum)
+totalresrooms <- aggregate(cbusjoined$ResRooms, by = list(cbusjoined$GEOID), FUN = sum)
+
+
+# Clean the dataset by removing duplicate values
+
+cbusjoined <- cbusjoined[!duplicated(cbusjoined$GEOID),]
+
+# Rename columns to be human-friendly
+
+colnames(taxprod) <- c('GEOID', 'AvgTaxProd')
+colnames(gradrate) <- c('GEOID', 'AvgGradRate')
+colnames(totreslivsp) <- c('GEOID', 'TotResLivSp')
+colnames(totalresrooms) <- c('GEOID', 'TotResRooms')
+
+# Remove unnecessary columns no longer needed in aggregation
+
+cbusjoined <- cbusjoined[,-c(10:24, 26)]
+
+# Left-joins for the Cleveland data set joined by census tracts, Voronoi polygon grad data, residential living space, and the total residential rooms
+
+cbusjoined <- left_join(cbusjoined, taxprod, by = 'GEOID')
+cbusjoined <- left_join(cbusjoined, gradrate, by = 'GEOID')
+cbusjoined <- left_join(cbusjoined, totreslivsp, by = 'GEOID')
+cbusjoined <- left_join(cbusjoined, totalresrooms, by = 'GEOID')
+
+# Turn graduation rate from percentage to decimal for comparison in scatter plot
+
+cbusjoined$AvgGradRate <- cbusjoined$AvgGradRate / 100
+
+# Create another variable for population density within census tracts
+
+cbusjoined$area <- st_area(cbusjoined)
+cbusjoined <- cbusjoined %>%
+  mutate(pop_den = (tpopE / area) / 3.86102e-7) # Roughly per sq mi
+```
+
+
+## Cleveland visualizaitons
+### Quick Maps
+
+```{r}
+# Census tracts by interpolated high school graduation rate
+
+gr <- tm_shape(cbusjoined, unit = 'mi') +
+  tm_polygons(col = 'AvgGradRate', title = 'HS Graduation Rate (Proportion)',
+              legend.hist = T, style = 'jenks') +
+  tm_scale_bar(position = c('right', 'bottom')) +
+  tm_compass(position = c('left', 'top')) +
+  tm_layout(frame = FALSE,
+          legend.outside = TRUE,
+          legend.outside.position = 'right',
+          legend.hist.width = 3,
+          main.title = 'HS Graduation Rates for Census Tracts within Cleveland, Ohio',
+          main.title.position = 'center')
+
+gr
+```
+
+
+```{r}
+# Demographic information per census tract
+
+re <- tm_shape(cbusjoined) +
+  tm_polygons(col = c('pct_nhw', 'pct_nhblk', 'pct_nhasn', 'pct_hisp'),
+             legend.col.is.portrait = TRUE, title = '% Race / Ethnicity',
+             border.alpha = 0.4) +
+  tm_facets(sync = TRUE, ncol = 2) +
+tm_layout(frame = FALSE,
+          main.title = 'Proportion of Each Race & Ethnicity',
+          main.title.position = 'left',
+          legend.outside = TRUE,
+          legend.outside.position = 'right',
+          panel.show = TRUE,
+          panel.labels = c('White', 'Black', 'Asian', 'Hispanic'),
+          panel.label.size = 1.3,
+          panel.label.bg.color = 'white')
+
+re
+```
+
+
+```{r}
+tp <- tm_shape(cbusjoined, unit = 'mi') +
+  tm_polygons(col = 'AvgTaxProd', title = 'Avg. Tax Productivity ($ / Acre)',
+              palette = 'Greens', style = 'jenks', legend.hist = T) +
+  tm_scale_bar(position = c('right', 'bottom')) +
+  tm_compass(position = c('left', 'top')) +
+  tm_layout(frame = FALSE,
+          legend.outside = TRUE,
+          legend.outside.position = 'right',
+          legend.hist.width = 3,
+          main.title = 'Tax Productivity for Census Tracts within Cleveland, Ohio',
+          main.title.position = 'center')
+
+tp
+```
+
+
+### Stacked Bar Charts
+
+```{r warning=F}
+# Create stacked bar chart for deomgraphic information of the top 5 tax producing census tracts
+
+ct5 <- cbusjoined %>% slice_max(cbusjoined$AvgTaxProd, n = 6) # selecting 6 because one census tract is a lake census tract with no data
+
+# Repleace characters in census tract names to keep only numbers
+ct5$NAME <- gsub('[A-Z, a-z]*','', ct5$NAME)
+
+# Drop geometry and create bar chart by the value of the racial and ethnic percentages for each census tract
+toptaxtracts <- st_drop_geometry(ct5) %>%
+  group_by(NAME) %>%
+  summarise(n=n(),
+            'Non-Hisp. White' = pct_nhw,
+            'Non-Hisp. Black' = pct_nhblk,
+            'Non-Hisp. Asian' = pct_nhasn,
+            'Hispanic' = pct_hisp) %>% 
+  gather("key", "value", - c(NAME, n)) %>%
+  ggplot(aes(x = NAME, y = value, group = key, fill = key)) + geom_col() +
+  theme(panel.background = element_blank()) +
+  labs(title = 'Top 5 Census Tracts by Average Land Tax Value, Cleveland, Ohio',
+       x = 'Census Tract',
+       y = 'Race / Ethnicity (Propotion of Total)',
+       fill = 'Race / Ethnicity')
+
+toptaxtracts
+```
+
+
+```{r}
+# Create stacked bar chart for deomgraphic information of the bottom 5 tax producing census tracts
+
+cb5 <- cbusjoined %>% slice_min(cbusjoined$AvgTaxProd, n = 5)
+
+# Repleace characters in census tract names to keep only numbers
+
+cb5$NAME <- gsub('[A-Z, a-z]*','', cb5$NAME)
+
+# Drop geometry and create bar chart by the value of the racial and ethnic percentages for each census tract
+
+lowesttaxtracts <- st_drop_geometry(cb5) %>%
+  group_by(NAME) %>%
+  summarise(n=n(),
+            'Non-Hisp. White' = pct_nhw,
+            'Non-Hisp. Black' = pct_nhblk,
+            'Non-Hisp. Asian' = pct_nhasn,
+            'Hispanic' = pct_hisp) %>% 
+  gather("key", "value", - c(NAME, n)) %>%
+  ggplot(aes(x = NAME, y = value, group = key, fill = key)) + geom_col() +
+  theme(panel.background = element_blank()) +
+  labs(title = 'Bottom 5 Census Tracts by Average Land Tax Value, Cleveland, Ohio',
+       x = 'Census Tract',
+       y = 'Race / Ethnicity (Propotion of Total)',
+       fill = 'Race / Ethnicity')
+
+lowesttaxtracts
+```
